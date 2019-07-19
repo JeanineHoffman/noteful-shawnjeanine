@@ -1,5 +1,5 @@
 
-const app = require('../src/App')
+const app = require('../src/app')
 
 describe('App', () => {
   it('GET / responds with 200 containing "Hello, world!"', () => {

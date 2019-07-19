@@ -11,23 +11,37 @@ const morganOption = (NODE_ENV === 'production')
   ? 'tiny'
   : 'common';
 
+// const validateBearerToken = require('./validate-bearer-token');
+const notesRouter = require('./api/notes/notes-router');
+// const logger = require('./logger')
+const foldersRouter = require('./api/folders/folders-router');
+
+app.use(morgan(morganOption));
+app.use(cors());
+app.use(helmet());
+// app.use(validateBearerToken)
+
+
 app.use(morgan(morganOption))
 app.use(cors())
 app.use(helmet())
 
 app.get('/', (req, res) => {
-    res.send('Hello, world!')
+  res.send('Hello, world!')
 })
 
+app.use(notesRouter)
+app.use(foldersRouter)
+
 app.use(function errorHandler(error, req, res, next) {
-      let response;
-      if (NODE_ENV === 'production') {
-        response = { error: { message: 'server error' }}
-      } else {
-        console.error(error)
-        response = { message: error.message, error }
-      }
-      res.status(500).json(response)
- })
+  let response;
+  if (NODE_ENV === 'production') {
+    response = { error: { message: 'server error' } }
+  } else {
+    console.error(error)
+    response = { message: error.message, error }
+  }
+  res.status(500).json(response)
+})
 
 module.exports = app
