@@ -3,11 +3,10 @@ const moment = require('moment');
 const knex = require('knex');
 const app = require('../src/app');
 const { makeNotesArray } = require('./notes.fixtures');
+const { makeFoldersArray } = require('./folders.fixtures');
 
 
-
-
-describe.only('Notes Endpoints', () => {
+describe('Notes Endpoints', () => {
   let db;
 
   before('Make knex instance', () => {
@@ -18,11 +17,19 @@ describe.only('Notes Endpoints', () => {
     app.set('db', db);
   })
 
+  after('Clean the notes table', () => db('notes').truncate());
+  after('clean the table', () => db.raw('TRUNCATE notes, folders RESTART IDENTITY CASCADE'))
   after('Disconnect from db', () => db.destroy());
 
-  before('Clean the table', () => db('notes').truncate());
+  before('clean the table', () => db.raw('TRUNCATE notes, folders RESTART IDENTITY CASCADE'))
+  afterEach('cleanup',() => db.raw('TRUNCATE notes RESTART IDENTITY CASCADE'))
 
-  afterEach('Clean up', () => db('notes').truncate());
+  before('Insert folders', () => {
+    const testFolders = makeFoldersArray()
+    return db
+      .into('folders')
+      .insert(testFolders)
+  })
 
   describe(`GET /api/notes`, () => {
     context(`Given no notes`, () => {
@@ -36,11 +43,12 @@ describe.only('Notes Endpoints', () => {
     context('Given there are notes in the database', () => {
       const testNotes = makeNotesArray()
 
-      beforeEach('insert notes', () => {
+      beforeEach('Insert notes', () => {
         return db
           .into('notes')
           .insert(testNotes)
       })
+      afterEach('Clean the notes table', () => db('notes').truncate());
 
       it('responds with 200 and all of the notes', () => {
         return supertest(app)
@@ -52,15 +60,16 @@ describe.only('Notes Endpoints', () => {
     context(`Given an XSS attack note`, () => {
       const maliciousNote = {
         id: 911,
-        title: 'Naughty naughty very naughty <script>alert("xss");</script>',
-        style: 'How-to',
-        content: `Bad image <img src="https://url.to.file.which/does-not.exist" onerror="alert(document.cookie);">. But not <strong>all</strong> bad.`
+        folder_id: 2,
+        note_title: 'Naughty naughty very naughty <script>alert("xss");</script>',
+        content: `Bad image <img src="https://url.to.file.which/does-not.exist" onerror="alert(document.cookie);">. But not <strong>all</strong> bad.`,
       }
+
       const sanitizedNotes = [{
         id: 911,
-        title: 'Naughty naughty very naughty &lt;script&gt;alert(\"xss\");&lt;/script&gt;',
-        style: 'How-to',
-        content: `Bad image <img src="https://url.to.file.which/does-not.exist">. But not <strong>all</strong> bad.`
+        folder_id: 2,
+        note_title: 'Naughty naughty very naughty &lt;script&gt;alert(\"xss\");&lt;/script&gt;',
+        content: `Bad image <img src="https://url.to.file.which/does-not.exist">. But not <strong>all</strong> bad.`,
       }]
 
       beforeEach('insert malicious note', () => {
@@ -74,8 +83,8 @@ describe.only('Notes Endpoints', () => {
           .get('/api/notes')
           .expect(200)
           .expect(res => {
-            expect(res.body[0].title).to.eql('Naughty naughty very naughty &lt;script&gt;alert(\"xss\");&lt;/script&gt;')
-            expect(res.body[0].content).to.eql(`Bad image <img src="https://url.to.file.which/does-not.exist">. But not <strong>all</strong> bad.`)
+            expect(res.body[0].note_title).to.eql(sanitizedNotes[0].note_title)
+            expect(res.body[0].content).to.eql(sanitizedNotes[0].content)
           })
       })
     })
@@ -94,7 +103,7 @@ describe.only('Notes Endpoints', () => {
     context('Given there are notes in the database', () => {
       const testNotes = makeNotesArray()
 
-      beforeEach('insert notes', () => {
+      beforeEach('Insert notes', () => {
         return db
           .into('notes')
           .insert(testNotes)
@@ -108,12 +117,13 @@ describe.only('Notes Endpoints', () => {
           .expect(200, expectedNote)
       })
     })
+
     context(`Given an XSS attack note`, () => {
       const maliciousNote = {
         id: 911,
-        title: 'Naughty naughty very naughty <script>alert("xss");</script>',
-        style: 'How-to',
-        content: `Bad image <img src="https://url.to.file.which/does-not.exist" onerror="alert(document.cookie);">. But not <strong>all</strong> bad.`
+        folder_id: 2,
+        note_title: 'Naughty naughty very naughty <script>alert("xss");</script>',
+        content: `Bad image <img src="https://url.to.file.which/does-not.exist" onerror="alert(document.cookie);">. But not <strong>all</strong> bad.`,
       }
 
       beforeEach('insert malicious note', () => {
@@ -127,7 +137,7 @@ describe.only('Notes Endpoints', () => {
           .get(`/api/notes/${maliciousNote.id}`)
           .expect(200)
           .expect(res => {
-            expect(res.body.title).to.eql('Naughty naughty very naughty &lt;script&gt;alert(\"xss\");&lt;/script&gt;')
+            expect(res.body.note_title).to.eql('Naughty naughty very naughty &lt;script&gt;alert(\"xss\");&lt;/script&gt;')
             expect(res.body.content).to.eql(`Bad image <img src="https://url.to.file.which/does-not.exist">. But not <strong>all</strong> bad.`)
           })
       })
@@ -135,26 +145,26 @@ describe.only('Notes Endpoints', () => {
   })
 
   describe(`POST /api/notes`, () => {
-    it(`creates an note, responding with 201 and the new note`, function () {
+    it(`creates a note, responding with 201 and the new note`, function () {
       this.retries(3);
       const newNote = {
-        title: 'Test new note',
-        style: 'Listicle',
-        content: 'Test new note content...'
+        note_title: 'This Is a Test Note Title',
+        content: 'Testing new note content...',
+        folder_id: 2
       }
       return supertest(app)
         .post('/api/notes')
         .send(newNote)
         .expect(201)
         .expect(res => {
-          expect(res.body.title).to.eql(newNote.title)
-          expect(res.body.style).to.eql(newNote.style)
+          expect(res.body.note_title).to.eql(newNote.note_title)
           expect(res.body.content).to.eql(newNote.content)
+          expect(res.body.folder_id).to.eql(newNote.folder_id)
           expect(res.body).to.have.property('id')
           expect(res.headers.location).to.eql(`/api/notes/${res.body.id}`)
-          const expected = new Date().toLocaleString();
-          const actual = new Date(res.body.date_published).toLocaleString();
-          expect(actual).to.eql(expected)
+          const expectedDate = new Date().toLocaleString();
+          const actualDate = new Date(res.body.date_modified).toLocaleString();
+          expect(actualDate).to.eql(expectedDate)
         })
         .then(postRes =>
           supertest(app)
@@ -162,13 +172,13 @@ describe.only('Notes Endpoints', () => {
             .expect(postRes.body)
         )
     })
-    const requiredFields = ['title', 'style', 'content']
+    const requiredFields = ['content', 'folder_id', 'note_title']
 
     requiredFields.forEach(field => {
       const newNote = {
-        title: 'Test new note',
-        style: 'Listicle',
-        content: 'Test new note content...'
+        note_title: 'This Is a Test Note Title',
+        content: 'Testing new note content...',
+        folder_id: '2'
       }
       it(`responds with 400 and an error message when the '${field}' is missing`, () => {
         delete newNote[field]
@@ -182,18 +192,19 @@ describe.only('Notes Endpoints', () => {
     })
 
     context(`Given an XSS attack note`, () => {
-      it(`removes any XSS attack content, and creates an note, responding with 201`, function () {
+      it(`removes any XSS attack content, and creates a note, responding with 201`, function () {
         const maliciousNote = {
-          title: 'Naughty naughty very naughty <script>alert("xss");</script>',
-          style: 'How-to',
-          content: `Bad image <img src="https://url.to.file.which/does-not.exist" onerror="alert(document.cookie);">. But not <strong>all</strong> bad.`
+            id: 911,
+            folder_id: 2,
+            note_title: 'Naughty naughty very naughty <script>alert("xss");</script>',
+            content: `Bad image <img src="https://url.to.file.which/does-not.exist" onerror="alert(document.cookie);">. But not <strong>all</strong> bad.`,
         }
         return supertest(app)
           .post('/api/notes')
           .send(maliciousNote)
           .expect(201)
           .expect(res => {
-            expect(res.body.title).to.eql('Naughty naughty very naughty &lt;script&gt;alert(\"xss\");&lt;/script&gt;')
+            expect(res.body.note_title).to.eql('Naughty naughty very naughty &lt;script&gt;alert(\"xss\");&lt;/script&gt;')
             expect(res.body.content).to.eql(`Bad image <img src="https://url.to.file.which/does-not.exist">. But not <strong>all</strong> bad.`)
           })
       })
@@ -203,11 +214,13 @@ describe.only('Notes Endpoints', () => {
   describe(`DELETE /api/notes/:note_id`, () => {
     context('Given there are notes in the database', () => {
       const testNotes = makeNotesArray()
-      beforeEach('insert notes', () => {
+
+      beforeEach('Insert notes', () => {
         return db
           .into('notes')
           .insert(testNotes)
       })
+
       it('responds with 204 and removes the note', () => {
         const idToRemove = 2
         const expectedNotes = testNotes.filter(note => note.id !== idToRemove)
@@ -231,36 +244,35 @@ describe.only('Notes Endpoints', () => {
     })
   })
 
-  describe.only(`PATCH /notes/:note_id`, () => {
+  describe(`PATCH /api/notes/:note_id`, () => {
     context(`Given no notes`, () => {
       it(`responds with 404`, () => {
         const noteId = 123456
         return supertest(app)
-          .patch(`/notes/${noteId}`)
+          .patch(`/api/notes/${noteId}`)
           .expect(404, { error: { message: `Note doesn't exist` } })
       })
     })
     context('Given there are notes in the database', () => {
       const testNotes = makeNotesArray()
-      beforeEach('insert notes', () => {
+      beforeEach('Insert notes', () => {
         return db
           .into('notes')
           .insert(testNotes)
       })
+
       it('responds with 204 and updates the note', () => {
         const idToUpdate = 2
-        const updateNote = {
-          title: 'updated note title',
-          style: 'Interview',
-          content: 'updated note content',
+        const updatedNote = {
+          content: 'This note content has been updated',
         }
         const expectedNote = {
           ...testNotes[idToUpdate - 1],
-          ...updateNote
+          ...updatedNote
         }
         return supertest(app)
           .patch(`/api/notes/${idToUpdate}`)
-          .send(updateNote)
+          .send(updatedNote)
           .expect(204)
           .then(res =>
             supertest(app)
@@ -275,32 +287,9 @@ describe.only('Notes Endpoints', () => {
           .send({ irrelevantField: 'foo' })
           .expect(400, {
             error: {
-              message: `Request body must contain either 'title', 'style' or 'content'`
+              message: `Request body must contain 'content'`
             }
           })
-      })
-      it(`responds with 204 when updating only a subset of fields`, () => {
-        const idToUpdate = 2
-        const updateNote = {
-          title: 'updated note title',
-        }
-        const expectedNote = {
-          ...testNotes[idToUpdate - 1],
-          ...updateNote
-        }
-
-        return supertest(app)
-          .patch(`/api/notes/${idToUpdate}`)
-          .send({
-            ...updateNote,
-            fieldToIgnore: 'should not be in GET response'
-          })
-          .expect(204)
-          .then(res =>
-            supertest(app)
-              .get(`/api/notes/${idToUpdate}`)
-              .expect(expectedNote)
-          )
       })
     })
   })
