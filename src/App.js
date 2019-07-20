@@ -13,7 +13,6 @@ const morganOption = (NODE_ENV === 'production')
 
 // const validateBearerToken = require('./validate-bearer-token');
 const notesRouter = require('./notes/notes-router');
-// const logger = require('./logger')
 const foldersRouter = require('./folders/folders-router');
 
 app.use(morgan(morganOption));

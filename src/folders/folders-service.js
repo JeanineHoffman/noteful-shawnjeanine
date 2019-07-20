@@ -19,19 +19,7 @@ const FoldersService = {
           .select('*')
           .where('id', foldersID)
           .first()
-  },
-
-//   deleteFolder(knexInstance, id) {
-//       return knexInstance('folders')
-//           .where({ id })
-//           .delete()
-//   },
-
-//   updateFolder(knexInstance, id, newFolderFields) {
-//       return knexInstance('folders')
-//           .where({ id })
-//           .update(newFolderFields)
-//   },
+  }
 }
 
 module.exports = FoldersService

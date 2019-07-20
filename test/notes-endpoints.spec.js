@@ -17,10 +17,12 @@ describe('Notes Endpoints', () => {
     app.set('db', db);
   })
 
+  // Good Database Hygiene: Make sure that tables are clear
+  // of data before we begin testing, and disconnect from
+  // the database after testing is complete
   after('Clean the notes table', () => db('notes').truncate());
   after('clean the table', () => db.raw('TRUNCATE notes, folders RESTART IDENTITY CASCADE'))
   after('Disconnect from db', () => db.destroy());
-
   before('clean the table', () => db.raw('TRUNCATE notes, folders RESTART IDENTITY CASCADE'))
   afterEach('cleanup',() => db.raw('TRUNCATE notes RESTART IDENTITY CASCADE'))
 

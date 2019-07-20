@@ -5,7 +5,7 @@ const app = require('../src/app');
 const { makeFoldersArray } = require('./folders.fixtures');
 
 
-describe.only('Folders Endpoints', () => {
+describe('Folders Endpoints', () => {
   let db;
 
   before('Make knex instance', () => {
@@ -16,82 +16,61 @@ describe.only('Folders Endpoints', () => {
     app.set('db', db);
   })
 
-
-  after('Clean the notes table', () => db('notes').truncate());
-  after('clean the table', () => db.raw('TRUNCATE notes, folders RESTART IDENTITY CASCADE'))
+  // Good Database Hygiene: Make sure that tables are clear
+  // of data before we begin testing, and disconnect from
+  // the database after testing is complete
+  after('clean the table', () => db.raw('TRUNCATE folders RESTART IDENTITY CASCADE'))
   after('Disconnect from db', () => db.destroy());
+  before('clean the table', () => db.raw('TRUNCATE folders RESTART IDENTITY CASCADE'))
+  afterEach('cleanup',() => db.raw('TRUNCATE folders RESTART IDENTITY CASCADE'))
 
-  before('clean the table', () => db.raw('TRUNCATE notes, folders RESTART IDENTITY CASCADE'))
-  afterEach('cleanup',() => db.raw('TRUNCATE notes RESTART IDENTITY CASCADE'))
+  describe(`GET /api/folders`, () => {
+    context(`Given no folders`, () => {
+      it(`responds with 200 and an empty list`, () => {
+        return supertest(app)
+          .get('/api/folders')
+          .expect(200, [])
+      })
+    })
 
-  before('Insert folders', () => {
-    const testFolders = makeFoldersArray()
-    return db
-      .into('folders')
-      .insert(testFolders)
+    context('Given there are folders in the database', () => {
+      const testFolders = makeFoldersArray()
+      beforeEach('Insert folders', () => {
+        return db
+          .into('folders')
+          .insert(testFolders)
+      })
+      it('responds with 200 and all of the folders', () => {
+        return supertest(app)
+          .get('/api/folders')
+          .expect(200, testFolders)
+      })
+    })
+
+    context(`Given an XSS attack folder`, () => {
+      const maliciousFolder = {
+        id: 912,
+        folder_name: 'Naughty naughty very naughty <script>alert("xss");</script>',
+      }
+      const sanitizedFolders = [{
+        id: 912,
+        folder_name: 'Naughty naughty very naughty &lt;script&gt;alert(\"xss\");&lt;/script&gt;',
+      }]
+      beforeEach('insert malicious folder', () => {
+        return db
+          .into('folders')
+          .insert([maliciousFolder])
+      })
+      it('responds with 200 and all of the folders, none of which contains XSS attack content', () => {
+        return supertest(app)
+          .get('/api/folders')
+          .expect(200)
+          .expect(res => {
+            expect(res.body[0].folder_name).to.eql(sanitizedFolders[0].folder_name)
+          })
+      })
+    })
   })
-
-
-
-
-  // after('Clean the folders table', () => db('folders').truncate());
-  //after('Disconnect from db', () => db.destroy());
-
-  // before('Clean the folders table', () => db('folders').truncate());
-  // afterEach('Clean up folders', () => db('folders').truncate());
-
-  // describe(`GET /api/folders`, () => {
-  //   context(`Given no folders`, () => {
-  //     it(`responds with 200 and an empty list`, () => {
-  //       return supertest(app)
-  //         .get('/api/folders')
-  //         .expect(200, [])
-  //     })
-  //   })
-
-  //   context('Given there are folders in the database', () => {
-  //     const testFolders = makeFoldersArray()
-
-  //     beforeEach('Insert folders', () => {
-  //       return db
-  //         .into('folders')
-  //         .insert(testFolders)
-  //     })
-
-  //     it('responds with 200 and all of the folders', () => {
-  //       return supertest(app)
-  //         .get('/api/folders')
-  //         .expect(200, testFolders)
-  //     })
-  //   })
-
-  //   context(`Given an XSS attack folder`, () => {
-  //     const maliciousFolder = {
-  //       id: 912,
-  //       folder_name: 'Naughty naughty very naughty <script>alert("xss");</script>',
-  //     }
-
-  //     const sanitizedFolders = [{
-  //       id: 912,
-  //       folder_name: 'Naughty naughty very naughty &lt;script&gt;alert(\"xss\");&lt;/script&gt;',
-  //     }]
-
-  //     beforeEach('insert malicious folder', () => {
-  //       return db
-  //         .into('folders')
-  //         .insert([maliciousFolder])
-  //     })
-
-  //     it('responds with 200 and all of the folders, none of which contains XSS attack content', () => {
-  //       return supertest(app)
-  //         .get('/api/folders')
-  //         .expect(200)
-  //         .expect(res => {
-  //           expect(res.body[0].folder_name).to.eql(sanitizedFolders[0].folder_name)
-  //         })
-  //     })
-  //   })
-  // })
 
   describe(`GET /api/folders/:folder_id`, () => {
     context(`Given no folders`, () => {
@@ -103,45 +82,41 @@ describe.only('Folders Endpoints', () => {
       })
     })
 
-    // context('Given there are folders in the database', () => {
-    //   // const testFolders = makeFoldersArray()
+    context('Given there are folders in the database', () => {
+      const testFolders = makeFoldersArray()
+      beforeEach('Insert folders', () => {
+        return db
+          .into('folders')
+          .insert(testFolders)
+      })
+      it('responds with 200 and the specified folder', () => {
+        const folderId = 2
+        const expectedFolder = testFolders[folderId - 1]
+        return supertest(app)
+          .get(`/api/folders/${folderId}`)
+          .expect(200, expectedFolder)
+      })
+    })
 
-    //   // beforeEach('Insert folders', () => {
-    //   //   return db
-    //   //     .into('folders')
-    //   //     .insert(testFolders)
-    //   // })
-
-    //   it('responds with 200 and the specified folder', () => {
-    //     const folderId = 2
-    //     const expectedFolder = testFolders[folderId - 1]
-    //     return supertest(app)
-    //       .get(`/api/folders/${folderId}`)
-    //       .expect(200, expectedFolder)
-    //   })
-    // })
-
-    // context(`Given an XSS attack folder`, () => {
-    //   const maliciousFolder = {
-    //     id: 913,
-    //     folder_name: 'Naughty naughty very naughty <script>alert("xss");</script>',
-    //   }
-
-    //   beforeEach('insert malicious folder', () => {
-    //     return db
-    //       .into('folders')
-    //       .insert([maliciousFolder])
-    //   })
-
-    //   it('removes XSS attack content', () => {
-    //     return supertest(app)
-    //       .get(`/api/folders/${maliciousFolder.id}`)
-    //       .expect(200)
-    //       .expect(res => {
-    //         expect(res.body.folder_name).to.eql('Naughty naughty very naughty &lt;script&gt;alert(\"xss\");&lt;/script&gt;')
-    //       })
-    //   })
-    // })
+    context(`Given an XSS attack folder`, () => {
+      const maliciousFolder = {
+        id: 913,
+        folder_name: 'Naughty naughty very naughty <script>alert("xss");</script>',
+      }
+      beforeEach('insert malicious folder', () => {
+        return db
+          .into('folders')
+          .insert([maliciousFolder])
+      })
+      it('removes XSS attack content', () => {
+        return supertest(app)
+          .get(`/api/folders/${maliciousFolder.id}`)
+          .expect(200)
+          .expect(res => {
+            expect(res.body.folder_name).to.eql('Naughty naughty very naughty &lt;script&gt;alert(\"xss\");&lt;/script&gt;')
+          })
+      })
+    })
   })
 
   describe(`POST /api/folders`, () => {
@@ -159,9 +134,6 @@ describe.only('Folders Endpoints', () => {
           expect(res.body.folder_name).to.eql(newFolder.folder_name)
           expect(res.body).to.have.property('id')
           expect(res.headers.location).to.eql(`/api/folders/${res.body.id}`)
-          // const expectedDate = new Date().toLocaleString();
-          // const actualDate = new Date(res.body.date_modified).toLocaleString();
-          // expect(actualDate).to.eql(expectedDate)
         })
         .then(postRes =>
           supertest(app)
