@@ -3,13 +3,13 @@ const moment = require('moment');
 const knex = require('knex');
 const app = require('../src/app');
 const { makeNotesArray } = require('./notes.fixtures');
-​
-​
-​
-​
+
+
+
+
 describe.only('Notes Endpoints', () => {
   let db;
-​
+
   before('Make knex instance', () => {
     db = knex({
       client: 'pg',
@@ -17,13 +17,13 @@ describe.only('Notes Endpoints', () => {
     })
     app.set('db', db);
   })
-​
+
   after('Disconnect from db', () => db.destroy());
-​
+
   before('Clean the table', () => db('notes').truncate());
-​
+
   afterEach('Clean up', () => db('notes').truncate());
-​
+
   describe(`GET /api/notes`, () => {
     context(`Given no notes`, () => {
       it(`responds with 200 and an empty list`, () => {
@@ -32,23 +32,23 @@ describe.only('Notes Endpoints', () => {
           .expect(200, [])
       })
     })
-​
+
     context('Given there are notes in the database', () => {
       const testNotes = makeNotesArray()
-​
+
       beforeEach('insert notes', () => {
         return db
           .into('notes')
           .insert(testNotes)
       })
-​
+
       it('responds with 200 and all of the notes', () => {
         return supertest(app)
           .get('/api/notes')
           .expect(200, testNotes)
       })
     })
-​
+
     context(`Given an XSS attack note`, () => {
       const maliciousNote = {
         id: 911,
@@ -62,13 +62,13 @@ describe.only('Notes Endpoints', () => {
         style: 'How-to',
         content: `Bad image <img src="https://url.to.file.which/does-not.exist">. But not <strong>all</strong> bad.`
       }]
-​
+
       beforeEach('insert malicious note', () => {
         return db
           .into('notes')
           .insert([maliciousNote])
       })
-​
+
       it('responds with 200 and all of the notes, none of which contains XSS attack content', () => {
         return supertest(app)
           .get('/api/notes')
@@ -80,7 +80,7 @@ describe.only('Notes Endpoints', () => {
       })
     })
   })
-​
+
   describe(`GET /api/notes/:note_id`, () => {
     context(`Given no notes`, () => {
       it(`responds with 404`, () => {
@@ -90,16 +90,16 @@ describe.only('Notes Endpoints', () => {
           .expect(404, { error: { message: `Note doesn't exist` } })
       })
     })
-​
+
     context('Given there are notes in the database', () => {
       const testNotes = makeNotesArray()
-​
+
       beforeEach('insert notes', () => {
         return db
           .into('notes')
           .insert(testNotes)
       })
-​
+
       it('responds with 200 and the specified note', () => {
         const noteId = 2
         const expectedNote = testNotes[noteId - 1]
@@ -115,13 +115,13 @@ describe.only('Notes Endpoints', () => {
         style: 'How-to',
         content: `Bad image <img src="https://url.to.file.which/does-not.exist" onerror="alert(document.cookie);">. But not <strong>all</strong> bad.`
       }
-​
+
       beforeEach('insert malicious note', () => {
         return db
           .into('notes')
           .insert([maliciousNote])
       })
-​
+
       it('removes XSS attack content', () => {
         return supertest(app)
           .get(`/api/notes/${maliciousNote.id}`)
@@ -133,7 +133,7 @@ describe.only('Notes Endpoints', () => {
       })
     })
   })
-​
+
   describe(`POST /api/notes`, () => {
     it(`creates an note, responding with 201 and the new note`, function () {
       this.retries(3);
@@ -163,7 +163,7 @@ describe.only('Notes Endpoints', () => {
         )
     })
     const requiredFields = ['title', 'style', 'content']
-​
+
     requiredFields.forEach(field => {
       const newNote = {
         title: 'Test new note',
@@ -180,7 +180,7 @@ describe.only('Notes Endpoints', () => {
           })
       })
     })
-​
+
     context(`Given an XSS attack note`, () => {
       it(`removes any XSS attack content, and creates an note, responding with 201`, function () {
         const maliciousNote = {
@@ -199,7 +199,7 @@ describe.only('Notes Endpoints', () => {
       })
     })
   })
-​
+
   describe(`DELETE /api/notes/:note_id`, () => {
     context('Given there are notes in the database', () => {
       const testNotes = makeNotesArray()
@@ -230,13 +230,13 @@ describe.only('Notes Endpoints', () => {
       })
     })
   })
-​
-  describe.only(`PATCH /api/notes/:note_id`, () => {
+
+  describe.only(`PATCH /notes/:note_id`, () => {
     context(`Given no notes`, () => {
       it(`responds with 404`, () => {
         const noteId = 123456
         return supertest(app)
-          .patch(`/api/notes/${noteId}`)
+          .patch(`/notes/${noteId}`)
           .expect(404, { error: { message: `Note doesn't exist` } })
       })
     })
@@ -288,7 +288,7 @@ describe.only('Notes Endpoints', () => {
           ...testNotes[idToUpdate - 1],
           ...updateNote
         }
-​
+
         return supertest(app)
           .patch(`/api/notes/${idToUpdate}`)
           .send({

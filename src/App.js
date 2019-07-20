@@ -12,9 +12,9 @@ const morganOption = (NODE_ENV === 'production')
   : 'common';
 
 // const validateBearerToken = require('./validate-bearer-token');
-const notesRouter = require('./api/notes/notes-router');
+const notesRouter = require('./notes/notes-router');
 // const logger = require('./logger')
-const foldersRouter = require('./api/folders/folders-router');
+const foldersRouter = require('./folders/folders-router');
 
 app.use(morgan(morganOption));
 app.use(cors());

@@ -3,13 +3,10 @@ const moment = require('moment');
 const knex = require('knex');
 const app = require('../src/app');
 const { makeFoldersArray } = require('./folders.fixtures');
-​
-​
-​
-​
+
 describe.skip('Folders Endpoints', () => {
   let db;
-​
+
   before('Make knex instance', () => {
     db = knex({
       client: 'pg',
@@ -17,13 +14,13 @@ describe.skip('Folders Endpoints', () => {
     })
     app.set('db', db);
   })
-​
+
   after('Disconnect from db', () => db.destroy());
-​
+
   before('Clean the table', () => db('folders').truncate());
-​
+
   afterEach('Clean up', () => db('folders').truncate());
-​
+
   describe(`GET /api/folders`, () => {
     context(`Given no folders`, () => {
       it(`responds with 200 and an empty list`, () => {
@@ -32,23 +29,23 @@ describe.skip('Folders Endpoints', () => {
           .expect(200, [])
       })
     })
-​
+
     context('Given there are folders in the database', () => {
       const testFolders = makeFoldersArray()
-​
+
       beforeEach('insert folders', () => {
         return db
           .into('folders')
           .insert(testFolders)
       })
-​
+
       it('responds with 200 and all of the folders', () => {
         return supertest(app)
           .get('/api/folders')
           .expect(200, testFolders)
       })
     })
-​
+
     context(`Given an XSS attack folder`, () => {
       const maliciousFolder = {
         id: 911,
@@ -62,13 +59,13 @@ describe.skip('Folders Endpoints', () => {
         style: 'How-to',
         content: `Bad image <img src="https://url.to.file.which/does-not.exist">. But not <strong>all</strong> bad.`
       }]
-​
+
       beforeEach('insert malicious folder', () => {
         return db
           .into('folders')
           .insert([maliciousFolder])
       })
-​
+
       it('responds with 200 and all of the folders, none of which contains XSS attack content', () => {
         return supertest(app)
           .get('/api/folders')
@@ -80,7 +77,7 @@ describe.skip('Folders Endpoints', () => {
       })
     })
   })
-​
+
   describe(`GET /api/folders/:folder_id`, () => {
     context(`Given no folders`, () => {
       it(`responds with 404`, () => {
@@ -90,16 +87,16 @@ describe.skip('Folders Endpoints', () => {
           .expect(404, { error: { message: `Folder doesn't exist` } })
       })
     })
-​
+
     context('Given there are folders in the database', () => {
       const testFolders = makeFoldersArray()
-​
+
       beforeEach('insert folders', () => {
         return db
           .into('folders')
           .insert(testFolders)
       })
-​
+
       it('responds with 200 and the specified folder', () => {
         const folderId = 2
         const expectedFolder = testFolders[folderId - 1]
@@ -115,13 +112,13 @@ describe.skip('Folders Endpoints', () => {
         style: 'How-to',
         content: `Bad image <img src="https://url.to.file.which/does-not.exist" onerror="alert(document.cookie);">. But not <strong>all</strong> bad.`
       }
-​
+
       beforeEach('insert malicious folder', () => {
         return db
           .into('folders')
           .insert([maliciousFolder])
       })
-​
+
       it('removes XSS attack content', () => {
         return supertest(app)
           .get(`/api/folders/${maliciousFolder.id}`)
@@ -133,7 +130,7 @@ describe.skip('Folders Endpoints', () => {
       })
     })
   })
-​
+
   describe(`POST /api/folders`, () => {
     it(`creates an folder, responding with 201 and the new folder`, function () {
       this.retries(3);
@@ -163,7 +160,7 @@ describe.skip('Folders Endpoints', () => {
         )
     })
     const requiredFields = ['title', 'style', 'content']
-​
+
     requiredFields.forEach(field => {
       const newFolder = {
         title: 'Test new folder',
@@ -180,7 +177,7 @@ describe.skip('Folders Endpoints', () => {
           })
       })
     })
-​
+
     context(`Given an XSS attack folder`, () => {
       it(`removes any XSS attack content, and creates an folder, responding with 201`, function () {
         const maliciousFolder = {
@@ -199,7 +196,7 @@ describe.skip('Folders Endpoints', () => {
       })
     })
   })
-​
+
   describe(`DELETE /api/folders/:folder_id`, () => {
     context('Given there are folders in the database', () => {
       const testFolders = makeFoldersArray()
@@ -230,7 +227,7 @@ describe.skip('Folders Endpoints', () => {
       })
     })
   })
-​
+
   describe.only(`PATCH /api/folders/:folder_id`, () => {
     context(`Given no folders`, () => {
       it(`responds with 404`, () => {
@@ -288,7 +285,7 @@ describe.skip('Folders Endpoints', () => {
           ...testFolders[idToUpdate - 1],
           ...updateFolder
         }
-​
+
         return supertest(app)
           .patch(`/api/folders/${idToUpdate}`)
           .send({
