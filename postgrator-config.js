@@ -11,5 +11,5 @@ module.exports = {
     "username": process.env.MIGRATION_DB_USER,
     "password": process.env.MIGRATION_DB_PASS,
     "validateChecksums": false,
-    // "ssl": true
+    "ssl": true
 }
